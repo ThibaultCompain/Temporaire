@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>ForceDirected avec couleurs et labels centrés</title>
+  <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f8f8f8;
+    }
+    #chartdiv {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="chartdiv"></div>
+
+  <script>
+  am5.ready(function() {
+    // Racine
+    var root = am5.Root.new("chartdiv");
+    root.setThemes([am5themes_Animated.new(root)]);
+
+    // Container zoomable
+    var zoomableContainer = root.container.children.push(
+      am5.ZoomableContainer.new(root, {
+        width: am5.p100,
+        height: am5.p100,
+        pinchZoom: true
+      })
+    );
+
+    // Outils de zoom
+    zoomableContainer.children.push(am5.ZoomTools.new(root, {
+      target: zoomableContainer
+    }));
+
+    // Données avec couleurs
+    var data = {
+      value: 0,
+      children: [
+        {
+          name: "Flora",
+          color: 0xe52a1f, // rouge
+          children: [
+            { name: "Black Tea", value: 1, color: 0xe52a1f }, // vert
+            { name: "Floral", value: 1, color: "#3498db" }     // bleu
+          ],
+		  link: ["Fruity"]
+        },
+        {
+          name: "Fruity",
+          color: "#f39c12", // orange
+          children: [
+            { name: "Berry", value: 1, color: "#9b59b6" }      // violet
+          ]
+        }
+      ]
+    };
+
+    // Série
+    var series = zoomableContainer.contents.children.push(
+      am5hierarchy.ForceDirected.new(root, {
+        singleBranchOnly: false,
+        downDepth: 2,
+        topDepth: 1,
+        initialDepth: 1,
+        valueField: "value",
+        categoryField: "name",
+        childDataField: "children",
+        idField: "name",
+		linkWithField: "link",
+        manyBodyStrength: -20,
+        centerStrength: 0.8,
+        maskContents: false
+      })
+    );
+
+    // --- Styles personnalisés ---
+    // Labels centrés
+    series.labels.template.setAll({
+      text: "{name}",
+      fontSize: 14,
+      centerX: am5.p50,
+      centerY: am5.p50,
+      textAlign: "center",
+      oversizedBehavior: "wrap", // ajuste si trop long
+      fill: am5.color(0xffffff) // texte blanc
+    });
+
+    // Adapter pour appliquer la couleur des données
+    series.circles.template.adapters.add("fill", function(fill, target) {
+      if (target.dataItem && target.dataItem.dataContext.color) {
+        return am5.color(target.dataItem.dataContext.color);
+      }
+      return fill; // palette si pas de couleur
+    });
+    series.circles.template.adapters.add("stroke", function(stroke, target) {
+      if (target.dataItem && target.dataItem.dataContext.color) {
+        return am5.color(target.dataItem.dataContext.color);
+      }
+      return stroke;
+    });
+
+    // Bordure et style généraux
+    series.circles.template.setAll({
+      strokeWidth: 2,
+      strokeOpacity: 1
+    });
+
+    // Données
+    series.data.setAll([data]);
+
+    // Animation d'apparition
+    series.appear(1000, 100);
+  }); // fin am5.ready
+  </script>
+</body>
+</html>
