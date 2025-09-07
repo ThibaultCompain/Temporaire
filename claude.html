@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Directed Tree - Business Analysis</title>
+    <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+	<script src="https://cdn.amcharts.com/lib/5/plugins/exporting.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+			max-height: 80%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        #chartdiv {
+            width: 100%;
+            height: 700px;
+            background: #fafbfc;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="debug" class="debug-info">Initialisation...</div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>Visualisation des Objets Data</h1>
+            <p>Force Directed Tree - Relations hiérarchiques et liens transversaux</p>
+        </div>        
+        <!-- Tooltip personnalisé -->
+        <div id="customTooltip" class="custom-tooltip">
+            <div class="tooltip-header">
+                <span class="tooltip-title" id="tooltipTitle"></span>
+                <button class="tooltip-close" onclick="hideCustomTooltip()">×</button>
+            </div>
+            <div class="tooltip-content" id="tooltipContent"></div>
+            <div id="tooltipActions"></div>
+        </div>
+        
+        <div id="chartdiv"></div>
+    </div>
+
+    <script>
+        const debug = document.getElementById('debug');
+        
+        function updateDebug(message) {
+            debug.textContent = message;
+            console.log(message);
+        }
+
+        // Données d'exemple simplifiées pour debug
+        const dataSets = {
+            sample1: {
+                name: "Customer 360°",
+                color: "#667eea",
+                shape: "circle",
+                description: "Vue consolidée du client",
+                link: "https://example.com/customer360",
+                linkText: "Voir documentation",
+                children: [
+                    {
+                        name: "CRM Salesforce",
+                        color: "#f093fb",
+                        shape: "diamond",
+                        type: "Source Critique",
+                        description: "Données clients principales",
+                        link: "https://salesforce.com",
+                        linkText: "Accéder à Salesforce",
+                        crossLinks: ["Marketing Automation"],
+                        children: [
+                            { 
+                                name: "Accounts API", 
+                                color: "#4facfe", 
+                                shape: "square",
+                                type: "API",
+                                description: "API des comptes clients",
+                                link: "https://developer.salesforce.com",
+                                linkText: "Documentation API"
+                            },
+                            { 
+                                name: "Contacts API", 
+                                color: "#4facfe", 
+                                shape: "square",
+                                type: "API"
+                            }
+                        ]
+                    },
+                    {
+                        name: "Marketing Automation",
+                        color: "#43e97b",
+                        shape: "triangle",
+                        type: "Source Externe",
+                        description: "Plateforme marketing automatisé",
+                        crossLinks: ["Support Tickets"],
+                        children: [
+                            { 
+                                name: "Email Campaigns", 
+                                color: "#ffecd2", 
+                                shape: "circle",
+                                type: "Export"
+                            }
+                        ]
+                    },
+                    {
+                        name: "Support Tickets",
+                        color: "#4facfe",
+                        shape: "square",
+                        type: "Source Standard"
+                    }
+                ]
+            },
+            
+            sample2: {
+                name: "Data Warehouse",
+                color: "#667eea",
+                shape: "circle",
+                children: [
+                    {
+                        name: "ERP SAP",
+                        color: "#f093fb",
+                        shape: "diamond",
+                        type: "Source Critique"
+                    },
+                    {
+                        name: "E-commerce",
+                        color: "#43e97b",
+                        shape: "triangle",
+                        type: "Source Externe"
+                    }
+                ]
+            },
+
+            sample3: {
+                name: "Analytics Platform",
+                color: "#667eea",
+                shape: "circle",
+                children: [
+                    {
+                        name: "Google Analytics",
+                        color: "#43e97b",
+                        shape: "triangle",
+                        type: "Source Externe"
+                    },
+                    {
+                        name: "Mobile Apps",
+                        color: "#f093fb",
+                        shape: "diamond",
+                        type: "Source Critique"
+                    }
+                ]
+            }
+        };
+
+        let root, chart, currentFontSize = 12;
+
+        // Test de compatibilité amCharts
+        if (typeof am5 === 'undefined') {
+            updateDebug('❌ amCharts non chargé');
+        } else {
+            updateDebug('✅ amCharts chargé, version: ' + (am5.version || 'inconnue'));
+        }
+
+        // Initialisation
+        am5.ready(function() {
+            try {
+                updateDebug('Initialisation amCharts...');
+                
+                // Création du root
+                root = am5.Root.new("chartdiv");
+                updateDebug('Root créé');
+                
+                // Thème
+                root.setThemes([am5themes_Animated.new(root)]);
+                updateDebug('Thème appliqué');
+                
+                // Container
+                const container = root.container.children.push(
+                    am5.Container.new(root, {
+                        width: am5.percent(100),
+                        height: am5.percent(100),
+                        layout: root.verticalLayout
+                    })
+                );
+                updateDebug('Container créé');
+                
+                // Force Directed Chart
+                chart = container.children.push(
+                    am5hierarchy.ForceDirected.new(root, {
+                        singleBranchOnly: false,
+                        downDepth: 10,
+                        topDepth: 1,
+                        initialDepth: 10,
+                        valueField: "value",
+                        categoryField: "name",
+                        childDataField: "children",
+                        idField: "name",
+                        manyBodyStrength: -15,
+                        centerStrength: 0.8
+                    })
+                );
+                updateDebug('Chart créé');
+                
+                // Configuration des nœuds
+                chart.nodes.template.setAll({
+                    templateField: "nodeSettings"
+                });
+                
+                // Configuration des liens
+                chart.links.template.setAll({
+                    strokeWidth: 2,
+                    strokeOpacity: 0.6,
+                    stroke: am5.color("#999999")
+                });
+                
+                updateDebug('Configuration terminée');
+                
+                // Chargement des données
+                loadDataset('sample1');
+                
+                // Masquer debug après succès
+                setTimeout(() => {
+                    debug.style.display = 'none';
+                }, 3000);
+                
+            } catch (error) {
+                updateDebug('❌ Erreur: ' + error.message);
+                console.error('Erreur détaillée:', error);
+            }
+        });
+        
+        function loadDataset(datasetKey) {
+            if (!chart) {
+                updateDebug('❌ Chart non disponible');
+                return;
+            }
+            
+            const dataset = dataSets[datasetKey];
+            if (!dataset) {
+                updateDebug('❌ Dataset non trouvé: ' + datasetKey);
+                return;
+            }
+            
+            updateDebug('Chargement: ' + dataset.name);
+            
+            try {
+                // Préparation des données
+                const processedData = processDataForChart(dataset);
+                updateDebug('Données traitées: ' + JSON.stringify(processedData, null, 2).substring(0, 200) + '...');
+                
+                // Mise à jour des données
+                chart.data.setAll([processedData]);
+                updateDebug('Données chargées dans le chart');
+                
+                // Liens transversaux après délai
+                setTimeout(() => {
+                    createCrossLinks();
+                }, 1500);
+                
+            } catch (error) {
+                updateDebug('❌ Erreur chargement: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        function processDataForChart(node, depth = 0) {
+            const processed = {
+                name: node.name,
+                value: 50 + (3 - depth) * 20, // Valeurs plus importantes
+                depth: depth,
+                type: node.type || (depth === 0 ? "Objet Principal" : "Source"),
+                description: node.description || "",
+                link: node.link || "",
+                linkText: node.linkText || "Voir plus",
+                crossLinks: node.crossLinks || [],
+                nodeSettings: createNodeSettings(node, depth)
+            };
+            
+            if (node.children && node.children.length > 0) {
+                processed.children = node.children.map(child => 
+                    processDataForChart(child, depth + 1)
+                );
+            }
+            
+            return processed;
+        }
+        
+        function createNodeSettings(node, depth) {
+            const color = am5.color(node.color || "#667eea");
+            
+            return {
+                fill: color,
+                stroke: color,
+                strokeWidth: 3,
+                strokeOpacity: 1,
+                radius: 15 + (3 - depth) * 5, // Taille dynamique
+                label: {
+                    text: node.name,
+                    fontSize: currentFontSize,
+                    fontWeight: "600",
+                    fill: am5.color("#ffffff"),
+                    centerX: am5.p50,
+                    centerY: am5.p50
+                }
+            };
+        }
+        
+        function createCrossLinks() {
+            if (!chart || !chart.nodes) {
+                updateDebug('Pas de nœuds pour les liens transversaux');
+                return;
+            }
+            
+            updateDebug('Création des liens transversaux...');
+            
+            const nodes = [];
+            chart.nodes.each(function(node) {
+                nodes.push(node);
+            });
+            
+            let linksCreated = 0;
+            
+            nodes.forEach(function(node) {
+                const nodeData = node.dataItem.dataContext;
+                if (nodeData.crossLinks && nodeData.crossLinks.length > 0) {
+                    nodeData.crossLinks.forEach(targetName => {
+                        const targetNode = nodes.find(n => n.dataItem.dataContext.name === targetName);
+                        if (targetNode) {
+                            try {
+                                chart.links.push(
+                                    am5hierarchy.HierarchyLink.new(root, {
+                                        source: node,
+                                        target: targetNode,
+                                        stroke: am5.color("#ff6b6b"),
+                                        strokeWidth: 3,
+                                        strokeOpacity: 0.8,
+                                        strokeDasharray: [5, 5]
+                                    })
+                                );
+                                linksCreated++;
+                            } catch (e) {
+                                console.error('Erreur création lien:', e);
+                            }
+                        }
+                    });
+                }
+            });
+            
+            updateDebug(linksCreated + ' liens transversaux créés');
+        }
+        
+        function showCustomTooltip(nodeData) {
+            const tooltip = document.getElementById('customTooltip');
+            const title = document.getElementById('tooltipTitle');
+            const content = document.getElementById('tooltipContent');
+            const actions = document.getElementById('tooltipActions');
+            
+            title.textContent = nodeData.name;
+            
+            let contentHTML = '';
+            if (nodeData.type) contentHTML += `<div class="tooltip-field"><strong>Type:</strong> ${nodeData.type}</div>`;
+            if (nodeData.description) contentHTML += `<div class="tooltip-field"><strong>Description:</strong> ${nodeData.description}</div>`;
+            contentHTML += `<div class="tooltip-field"><strong>Niveau:</strong> ${nodeData.depth}</div>`;
+            if (nodeData.crossLinks && nodeData.crossLinks.length > 0) {
+                contentHTML += `<div class="tooltip-field"><strong>Liens transversaux:</strong> ${nodeData.crossLinks.join(', ')}</div>`;
+            }
+            
+            content.innerHTML = contentHTML;
+            
+            let actionsHTML = '';
+            if (nodeData.link && nodeData.linkText) {
+                actionsHTML = `<a href="${nodeData.link}" target="_blank" class="tooltip-link">${nodeData.linkText}</a>`;
+            }
+            actions.innerHTML = actionsHTML;
+            
+            tooltip.classList.add('visible');
+        }
+        
+        function hideCustomTooltip() {
+            document.getElementById('customTooltip').classList.remove('visible');
+        }
+        
+        function resetZoom() {
+            if (chart) {
+                chart.zoomToFit();
+            }
+        }
+        
+        function exportChart() {
+            if (root) {
+                try {
+                    const exporting = am5.exporting.Exporting.new(root, {
+                        pngOptions: {
+                            quality: 0.8
+                        }
+                    });
+                    exporting.download("png");
+                } catch (e) {
+                    alert('Export non disponible');
+                }
+            }
+        }
+        
+        // Fermer tooltip en cliquant ailleurs
+        document.addEventListener('click', function(e) {
+            const tooltip = document.getElementById('customTooltip');
+            if (!tooltip.contains(e.target) && !e.target.closest('#chartdiv')) {
+                hideCustomTooltip();
+            }
+        });
+        
+        // Nettoyage
+        window.addEventListener('beforeunload', function() {
+            if (root) {
+                root.dispose();
+            }
+        });
+    </script>
+</body>
+</html>
