@@ -1,32 +1,41 @@
-WITH metadata AS (
-  SELECT
-    column_name,
-    data_type,
-    ordinal_position
-  FROM
-    INFORMATION_SCHEMA.COLUMNS
-  WHERE
-    table_schema = 'votre_schema'
-    AND table_name = 'votre_table'
-),
-sample_data AS (
-  SELECT
-    m.column_name,
-    (
-      SELECT ARRAY_AGG(DISTINCT CAST(t.`${m.column_name}` AS STRING) LIMIT 3)
-      FROM votre_schema.votre_table t
-      WHERE CAST(t.`${m.column_name}` AS STRING) IS NOT NULL
-      LIMIT 100
-    ) AS exemples_valeurs
-  FROM
-    metadata m
-)
-SELECT
-  m.column_name,
-  m.data_type,
-  m.ordinal_position,
-  s.exemples_valeurs
-FROM
-  metadata m
-JOIN
-  sample_data s ON m.column_name = s.column_name;
+def generer_requete_hive(nom_schema, nom_table, liste_colonnes):
+    """
+    Génère une requête SQL Hive pour extraire des exemples de valeurs pour chaque colonne.
+
+    Args:
+        nom_schema (str): Nom du schéma Hive.
+        nom_table (str): Nom de la table Hive.
+        liste_colonnes (list): Liste des noms de colonnes (obtenue via DESCRIBE).
+    Returns:
+        str: Requête SQL Hive complète.
+    """
+    requete = ""
+    for i, colonne in enumerate(liste_colonnes):
+        requete += f"""
+        SELECT
+          '{colonne}' AS column_name,
+          (
+            SELECT ARRAY_AGG(DISTINCT CAST({colonne} AS STRING) LIMIT 3)
+            FROM {nom_schema}.{nom_table}
+            WHERE CAST({colonne} AS STRING) IS NOT NULL
+            LIMIT 100
+          ) AS exemples_valeurs
+        """
+        if i < len(liste_colonnes) - 1:
+            requete += "UNION ALL\n"
+
+    return requete
+
+# Exemple d'utilisation :
+# Remplacez les valeurs ci-dessous par les vôtres
+nom_schema = "votre_schema"
+nom_table = "votre_table"
+liste_colonnes = [
+    "colonne1",
+    "colonne2",
+    "colonne3"
+    # Ajoutez ici les autres colonnes obtenues via DESCRIBE
+]
+
+requete_hive = generer_requete_hive(nom_schema, nom_table, liste_colonnes)
+print(requete_hive)
