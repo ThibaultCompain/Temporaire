@@ -1,0 +1,32 @@
+WITH metadata AS (
+  SELECT
+    column_name,
+    data_type,
+    ordinal_position
+  FROM
+    INFORMATION_SCHEMA.COLUMNS
+  WHERE
+    table_schema = 'votre_schema'
+    AND table_name = 'votre_table'
+),
+sample_data AS (
+  SELECT
+    m.column_name,
+    (
+      SELECT ARRAY_AGG(DISTINCT CAST(t.`${m.column_name}` AS STRING) LIMIT 3)
+      FROM votre_schema.votre_table t
+      WHERE CAST(t.`${m.column_name}` AS STRING) IS NOT NULL
+      LIMIT 100
+    ) AS exemples_valeurs
+  FROM
+    metadata m
+)
+SELECT
+  m.column_name,
+  m.data_type,
+  m.ordinal_position,
+  s.exemples_valeurs
+FROM
+  metadata m
+JOIN
+  sample_data s ON m.column_name = s.column_name;
